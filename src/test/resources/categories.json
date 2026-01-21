@@ -1,0 +1,17 @@
+[
+  {
+    "name": "API Failures",
+    "matchedStatuses": ["failed"],
+    "messageRegex": ".*[Aa]ssert.*|.*[Ee]rror.*|.*[Ff]ail.*"
+  },
+  {
+    "name": "Product Defects",
+    "matchedStatuses": ["failed"],
+    "messageRegex": ".*[Pp]roduct.*[Bb]ug.*|.*[Dd]efect.*"
+  },
+  {
+    "name": "Test Issues",
+    "matchedStatuses": ["broken"],
+    "messageRegex": ".*[Tt]est.*[Ii]ssue.*|.*[Bb]roken.*[Tt]est.*"
+  }
+]
