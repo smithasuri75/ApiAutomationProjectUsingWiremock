@@ -35,17 +35,11 @@ public class GetObjectByIdApiMockTest {
         wireMockServer.start();
          // Get the dynamically assigned port
         dynamicPort = wireMockServer.port();
-        
-        // Configure RestAssured to use WireMock server
-        RestAssured.baseURI = "http://localhost";
-        RestAssured.port = dynamicPort;
-        
+
         // Add Allure RestAssured filter for request/response logging
         RestAssured.filters(new AllureRestAssured());
 
-        System.out.println("=== WireMock Server Started ===");
-        System.out.println("Running on dynamic port: " + dynamicPort);
-        System.out.println("Base URL: http://localhost:" + dynamicPort);
+        System.out.println("============================ WireMock Server Started ============================");
         
     }
 
