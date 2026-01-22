@@ -30,25 +30,36 @@ pipeline {
     }
 
     stages {
+        stage('Environment Check') {
+            steps {
+                echo 'Checking available tools...'
+                sh 'echo "PATH: $PATH"'
+                sh 'java -version'
+                sh 'which mvn || echo "Maven not found in PATH"'
+                sh 'which git || echo "Git not found in PATH"'
+            }
+        }
+
         stage('Checkout') {
             steps {
                 echo "Cloning repo ${env.REPO_URL}"
                 git branch: "${env.BRANCH}", url: "${env.REPO_URL}"
-                bat 'git status'
+                sh 'git status'
             }
         }
 
         stage('Build') {
             steps {
                 echo 'Building project...'
-                bat 'mvn clean compile'
+                sh 'mvn clean compile'
+            }
             }
         }
 
         stage('Run Tests') {
             steps {
                 echo "Running TestNG suite: ${params.TEST_SUITE}"
-                bat "mvn test -DsuiteXmlFile=${params.TEST_SUITE}"
+                sh "mvn test -DsuiteXmlFile=${params.TEST_SUITE}"
             }
             post {
                 always {
@@ -62,7 +73,7 @@ pipeline {
         stage('Generate Allure Report') {
             steps {
                 echo 'Generating Allure report...'
-                bat 'mvn allure:report'
+                sh 'mvn allure:report'
             }
             post {
                 always {
