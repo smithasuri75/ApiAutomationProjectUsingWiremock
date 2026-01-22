@@ -1,5 +1,6 @@
 /*
  * Jenkins Pipeline for RestAssured API Testing with Allure Reporting
+ * UPDATED: 2026-01-21 - Docker-based pipeline without old Jenkins tool dependencies
  * 
  * Features:
  * - Docker-based execution with Maven and OpenJDK 11
