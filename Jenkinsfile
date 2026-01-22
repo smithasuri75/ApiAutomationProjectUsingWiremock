@@ -1,81 +1,103 @@
 /*
  * Jenkins Pipeline for RestAssured API Testing with Allure Reporting
  * 
- * Prerequisites:
- * 1. Install Allure Jenkins Plugin from Jenkins Plugin Manager
- * 2. Configure Global Tool Configuration -> Allure Commandline
- * 3. Maven and JDK tools configured as 'Maven3' and 'JDK11'
- * 
  * Features:
+ * - Docker-based execution with Maven and OpenJDK 11
  * - Parameterized test suite selection
+ * - Direct GitHub repository cloning
  * - TestNG and Allure report generation
- * - Automatic report publishing
+ * - HTML report publishing
  * - Test artifacts archiving
  */
 pipeline {
-    agent any
-
-    tools {
-        maven 'Maven3'
-        jdk 'JDK11'
+    agent {
+        docker {
+            image 'maven:3.9.2-openjdk-11'
+            args '-v $HOME/.m2:/root/.m2'
+        }
     }
 
     parameters {
-        choice(name: 'TEST_SUITE', choices: ['testng-objectMock.xml', 'testng-prescriptionMock.xml', 'testng-realApis.xml'], description: 'Select TestNG suite to run')
+        choice(
+            name: 'TEST_SUITE',
+            choices: ['testng-objectMock.xml', 'testng-prescriptionMock.xml', 'testng-realApis.xml'],
+            description: 'Select TestNG suite to run'
+        )
     }
 
     environment {
         MAVEN_OPTS = '-Xmx1024m'
         ALLURE_RESULTS_DIRECTORY = 'target/allure-results'
         JAVA_TOOL_OPTIONS = '-Dfile.encoding=UTF-8'
+        REPO_URL = 'https://github.com/smithasuri75/ApiAutomationProjectUsingWiremock.git'
+        BRANCH = 'main'
     }
 
     stages {
         stage('Checkout') {
             steps {
-                echo 'Checking out source code...'
-                checkout scm
+                echo "Cloning repo ${env.REPO_URL}"
+                sh "git clone -b ${env.BRANCH} ${env.REPO_URL} repo"
+                dir('repo') {
+                    sh 'git status'
+                }
             }
         }
 
         stage('Build') {
             steps {
-                echo 'Building the project...'
-                bat 'mvn clean compile'
+                dir('repo') {
+                    echo 'Building project...'
+                    sh 'mvn clean compile'
+                }
             }
         }
 
         stage('Run Tests') {
             steps {
-                echo "Running tests using ${params.TEST_SUITE}..."
-                bat "mvn test \"-DsuiteXmlFile=${params.TEST_SUITE}\""
+                dir('repo') {
+                    echo "Running TestNG suite: ${params.TEST_SUITE}"
+                    sh "mvn test -DsuiteXmlFile=${params.TEST_SUITE}"
+                }
             }
             post {
                 always {
-                    // Publish TestNG results
-                    testNG testResultsPattern: 'target/surefire-reports/testng-results.xml'
-                    
-                    // Archive Allure results
-                    archiveArtifacts artifacts: 'target/allure-results/**/*', allowEmptyArchive: true
+                    dir('repo') {
+                        echo 'Archiving TestNG reports and Allure results...'
+                        archiveArtifacts artifacts: 'target/surefire-reports/**/*', allowEmptyArchive: true
+                        archiveArtifacts artifacts: 'target/allure-results/**/*', allowEmptyArchive: true
+                    }
                 }
             }
         }
 
         stage('Generate Allure Report') {
             steps {
-                echo 'Generating Allure report...'
-                bat 'mvn allure:report'
+                dir('repo') {
+                    echo 'Generating Allure report...'
+                    sh '''
+                        if ! command -v allure &> /dev/null; then
+                            curl -o /tmp/allure.tgz -L https://github.com/allure-framework/allure2/releases/download/2.22.2/allure-2.22.2.tgz
+                            tar -zxvf /tmp/allure.tgz -C /opt
+                            ln -s /opt/allure-2.22.2/bin/allure /usr/bin/allure
+                            rm /tmp/allure.tgz
+                        fi
+                        allure generate target/allure-results -o target/allure-report --clean
+                    '''
+                }
             }
             post {
                 always {
-                    // Publish Allure report
-                    allure([
-                        includeProperties: false,
-                        jdk: '',
-                        properties: [],
-                        reportBuildPolicy: 'ALWAYS',
-                        results: [[path: 'target/allure-results']]
-                    ])
+                    dir('repo') {
+                        publishHTML([
+                            allowMissing: true,
+                            alwaysLinkToLastBuild: true,
+                            keepAll: true,
+                            reportDir: 'target/allure-report',
+                            reportFiles: 'index.html',
+                            reportName: 'Allure Report'
+                        ])
+                    }
                 }
             }
         }
@@ -83,20 +105,13 @@ pipeline {
 
     post {
         always {
-            echo 'Pipeline completed - reports available'
-            echo 'TestNG reports: target/surefire-reports/'
-            echo 'Allure reports: Published via Allure Jenkins plugin'
-            
-            // Clean up workspace but keep reports
-            cleanWs(patterns: [[pattern: 'target/allure-results/**', type: 'EXCLUDE']])
+            echo 'Pipeline finished. Check TestNG and Allure reports.'
         }
         success {
-            echo 'Pipeline completed successfully!'
-            echo 'All tests passed - check Allure report for details'
+            echo 'All tests passed successfully!'
         }
         failure {
-            echo 'Pipeline failed!'
-            echo 'Check Allure report for failure details and screenshots'
+            echo 'Some tests failed. Check reports for details.'
         }
     }
 }
